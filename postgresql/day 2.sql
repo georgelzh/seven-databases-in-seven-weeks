@@ -249,3 +249,39 @@ create rule delete_holidays as on delete to holidays do instead delete from even
 
 --delete a row
 delete from holidays where holiday_id =2;
+
+
+
+Day 2 Problem: I¡¯ll meet you at the crosstab
+Build a monthly calendar of events, where each month in the calendar year counts the number of events in that month. This kind of operation is commonly done by a pivot table. 
+
+--Query to count the number of events per month per year.
+Select extract (year from starts) as year, extract (month from starts) as month, count(*) 	
+	From events
+	Group by year, month;
+
+--use crosstab(), it must return three columns:rowid, category, and value.
+
+--create a temporary table to store a list of numbers. 
+Create temporary table month_count (month Int);
+Insert into month_count values (1), (2), (3), (4), (5), (6), (7), (8), (9), (10), (11), (12);
+
+
+--use crosstab() with two queries
+--Install tablefunc modules
+Create extension if not exists tablefunc;
+--https://stackoverflow.com/questions/3002499/postgresql-crosstab-query
+--https://www.diffchecker.com/diff
+
+Select * from crosstab(
+'SELECT
+extract(year from starts) as year,
+extract(month from starts) as month, count(*)
+FROM events
+GROUP BY year, month
+ORDER BY year, month',
+	'Select * from month_count')
+AS (year int, jan int, feb int, mar int, apr int, may int, jun int, jul int, aug int, sep int, oct int, nov int, dec int)  ORDER BY YEAR;
+
+
+Crosstab returns 3 columns: rowid, category, and value. We use year as an ID, the other fields are category(the month), and value(the count). 
