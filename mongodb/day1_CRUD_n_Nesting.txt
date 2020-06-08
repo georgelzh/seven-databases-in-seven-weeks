@@ -1,4 +1,4 @@
-# create a database called book
+// create a database called book
 mongo book
 
 show dbs
@@ -19,7 +19,7 @@ db.collectionName.find()	# return all data for the collection
 
 db.collectionName.find({ _id : ObjectId("id") }) # return the specific object
 
-# copy paste functions to the mongodb terminal, you will be able to call it
+// copy paste functions to the mongodb terminal, you will be able to call it
 function insertCity(
 name, population, lastCensus,
 famousFor, mayorInfo
@@ -34,28 +34,318 @@ mayor : mayorInfo
 }
 
 
-"""
+/*
 The find() function also accepts an optional second parameter: a fields object
 we can use to filter which fields are retrieved. If we want only the town name
 (along with _id), pass in name with a value resolving to 1 (or true).
-"""
+*/
 
 db.collectionName.find( { _id : ObjectId("id")}, {name : 1}) # return only name
 
-# return everything else except for name
+// return everything else except for name
 db.collectionName.find( { _id : ObjectId("id")}, {name : 0}) 
 
-"""
+/*
 As in PostgreSQL, in Mongo you can construct ad hoc queries on the basis of field
 values, ranges, or a combination of criteria. To find all towns that begin with the
 letter P and have a population less than 10,000, you can use a Perl-compatible
 regular expression (PCRE)2 and a range operator. This query should return the
 JSON object for Punxsutawney, but including only the name and population fields:
-"""
+*/
 
 db.towns.find(
 	{ name : /^P/, population : {$lt : 10000}},
 	{ _id: 0, name: 1, population : 1}
 )
-# {"/name" : "Punxsutawney", "population" : 6200 }
+// returns {"/name" : "Punxsutawney", "population" : 6200 }
+
+
+/*
+The good news about the querying language being JavaScript is that you can
+construct operations as you would objects. Here, we build criteria where the
+population must be between 10,000 and 1 million people.
+*/
+
+var population_range = {
+	$lt: 1000000,
+	$gt: 10000
+}
+
+db.towns.find(
+	{ name: /^P/, population: population_range },
+	{ name: 1 }
+)
+
+// { "_id" : ObjectId("5e098089c8435cf060041a45"), "name" : "Portland" }
+
+
+db.towns.find(
+	{ lastCensus: { $gte: ISODate('2016-06-01') } },
+	{ _id: 0, name: 1}
+)
+
+
+// {"name" : "New York" }
+// { "name" : "Portland" }
+
+
+
+///////////////// Digging Deep
+//Mongo loves nested array data. You can query by matching exact values:
+
+db.towns.find(
+	{ famoursFor: 'Food' },
+	{ _id: 0, name: 1, famousFor: 1 } 
+)_
+
+db.towns.find(
+	{ name: "New York" }
+)
+
+db.towns.find(
+	{ famousFor : 'food' },
+	{ _id : 0, name : 1, FamousFor : 1 }
+)
+
+// matching partial values:
+
+db.towns.find(
+	{ famousFor : /moma/i },
+	{ _id : 0, name : 1, famousFor : 1 }
+)
+
+// query by all matching values:
+
+db.towns.find(
+	{ famousFor : { $all : ['food', 'beer'] } },
+	{ _id : 0, name : 1, famousFor : 1}
+)
+
+// or lack or matching values:
+
+db.towns.find(
+	{ famousFor : { $nin : ['food', 'beer'] } },
+	{ _id : 0, name : 1, famousFor :  1 }
+)
+
+
+/*
+But the true power of Mongo stems from its ability to dig down into a document
+and return the results of deeply nested subdocuments. To query a subdocument,
+your field name is a string separating nested layers with a dot. For
+instance, you can find towns with mayors from the Democratic Party:
+*/
+
+db.towns.find(
+	{ 'mayor.party' : 'D' },
+	{ _id : 0, name : 1, mayer: 1 }
+)
+
+// or those with mayers who don't have a party
+
+db.towns.find(
+	{ 'mayor.party' : { $exists : false } },
+	{ _id : 0, name : 1, mayor: 1}
+)
+
+/*
+The previous queries are great if you want to find documents with a single
+matching field, but what if you need to match several fields of a subdocument?
+
+elemMatch
+
+We’ll round out our dig with the $elemMatch directive. Let’s create another collection
+that stores countries. This time we’ll override each _id to be a string
+of our choosing rather than an auto-generated identifier.
+*/
+
+db.countries.insert({
+	_id : "ca",
+	name : "Canada",
+	exports : {
+		foods : [
+		   	{ name: 'bacon', tasty : false },
+		   	{ name : 'syrup', tasty: true }
+		]
+	}
+})
+
+
+// checkout how many countries are created
+db.countries.count()
+
+// find a country not only exports bacon but exports tasty bacon
+
+db.countries.find(
+	{ 'exports.foods.name' : 'bacon', 'exports.foods.tasty' : true },
+	{ _id : 0, name : 1}
+)
+
+// this would return usa and canada, but canada is returned only bc its syrup
+// is tasty. so we are supposed to use $elemMatch
+
+db.countries.find(
+	{
+		'exports.foods' : {
+			$elemMatch : {
+				name : 'bacon',
+				tasty : true
+			}
+		}
+	},
+	{ _id : 0, name : 1}
+)
+
+/*
+$elemMatch criteria can utilize advanced operators, too. You can find any
+country that exports a tasty food that also has a condiment label:
+*/
+
+db.countries.find(
+	{
+		'exports.foods' : {
+			$elemMatch: {
+				tasty: true,
+				condiment : { $exists : true}
+			}
+		}
+	},
+	{ _id : 0, name : 1}
+)
+
+// Boolean Ops
+
+/*
+So far, all of our criteria are implicitly and operations. If you try to find a
+country with the name United States and an _id of mx, Mongo will yield no
+results.
+
+> db.countries.find(
+	{ _id : "mx", name : "United States" },
+	{ _id : 1 }
+)
+However, searching for one or the other with $or will return two results. Think
+of this layout like prefix notation: OR A B.
+*/
+
+db.countries.find(
+	{
+		$or : [
+			{_id: "mx"},
+			{ name : "United States"}
+		]
+	},
+	{ _id : 1}
+)
+
+{ "_id" : "us" }
+{ "_id" : "mx" }
+
+
+
+// some commands list below, but not all.
+// get a cheatsheet from mongo website or visits mongoDB online doc
+
+/*
+Command Description
+Match by any PCRE-compliant regular expression string (or
+just use the // delimiters as shown earlier)
+$regex
+$ne Not equal to
+$lt Less than
+$lte Less than or equal to
+$gt Greater than
+$gte Greater than or equal to
+$exists Check for the existence of a field
+$all Match all elements in an array
+$in Match any elements in an array
+$nin Does not match any elements in an array
+$elemMatch Match all fields in an array of nested documents
+$or or
+$nor Not or
+$size Match array of given size
+$mod Modulus
+$type Match if field is a given datatype
+$not Negate the given operator check
+*/
+
+
+// Updating, update some states to the the towns
+// update function takes two parameters, the first one is what you pass to find
+// the second parameter is either an object that will replace the matched doc
+// or a modifier operation. the modifier is "$set"
+
+db.towns.update(
+	{ _id : ObjectId("5e098089c8435cf060041a45") },
+	{ $set : {"state" : "OR" } }
+)
+
+// to replace the whole object, this has no $set
+db.towns.update(
+	{ _id : ObjectId("5e098089c8435cf060041a45") },
+	{ {"state" : "OR" } }
+)
+/*
+{
+	"_id" : ObjectId("5e098089c8435cf060041a45"),
+	"name" : "Portland",
+	"population" : 582000,
+	"lastCensus" : ISODate("2016-09-20T00:00:00Z"),
+	"famousFor" : [
+		"beer",
+		"food",
+		"Portlandia"
+	],
+	"mayor" : {
+		"name" : "Ted Wheeler",
+		"party" : "D"
+	},
+	"state" : "OR"
+}
+*/
+
+
+// You can do more than $set a value. $inc (increment a number) is a pretty useful
+// one. Let’s increment Portland’s population by 1,000.
+
+db.towns.update(
+	{ _id : ObjectId("5e098089c8435cf060041a45")},
+	{ $inc : { population: 1000 }}
+)
+
+// 	"population" : 583000,
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
