@@ -1,0 +1,61 @@
+# create a database called book
+mongo book
+
+show dbs
+
+use dbname
+
+db.help()
+
+db.collectionName.help()
+
+show collections
+
+typeof db
+
+db.collectionName.functionName # for checking the function code
+
+db.collectionName.find()	# return all data for the collection
+
+db.collectionName.find({ _id : ObjectId("id") }) # return the specific object
+
+# copy paste functions to the mongodb terminal, you will be able to call it
+function insertCity(
+name, population, lastCensus,
+famousFor, mayorInfo
+) {
+db.towns.insert({
+name: name,
+population: population,
+lastCensus: ISODate(lastCensus),
+famousFor: famousFor,
+mayor : mayorInfo
+});
+}
+
+
+"""
+The find() function also accepts an optional second parameter: a fields object
+we can use to filter which fields are retrieved. If we want only the town name
+(along with _id), pass in name with a value resolving to 1 (or true).
+"""
+
+db.collectionName.find( { _id : ObjectId("id")}, {name : 1}) # return only name
+
+# return everything else except for name
+db.collectionName.find( { _id : ObjectId("id")}, {name : 0}) 
+
+"""
+As in PostgreSQL, in Mongo you can construct ad hoc queries on the basis of field
+values, ranges, or a combination of criteria. To find all towns that begin with the
+letter P and have a population less than 10,000, you can use a Perl-compatible
+regular expression (PCRE)2 and a range operator. This query should return the
+JSON object for Punxsutawney, but including only the name and population fields:
+"""
+
+db.towns.find(
+	{ name : /^P/, population : {$lt : 10000}},
+	{ _id: 0, name: 1, population : 1}
+)
+# {"/name" : "Punxsutawney", "population" : 6200 }
+
