@@ -314,33 +314,135 @@ db.towns.update(
 )
 
 // 	"population" : 583000,
+db.towns.findOne({ _id : ObjectId("5e098089c8435cf060041a45") })
+
+/*
+Command Description
+$set Sets the given field with the given value
+$unset Removes the field
+$inc Adds the given field by the given number
+$pop Removes the last (or first) element from an array
+$push Adds the value to an array
+$pushAll Adds all values to an array
+$addToSet Similar to push, but won’t duplicate values
+$pull Removes matching values from an array
+$pullAll Removes all matching values from an array
+*/
+
+/* 
+References
+As we mentioned previously, Mongo isn’t built to perform joins. Because of
+its distributed nature, joins in Mongo would be pretty inefficient operations.
+Still, it’s sometimes useful for documents to reference each other. In these
+cases, the Mongo community suggests that you use a construct like { $ref :
+"collection_name", $id : "reference_id" }. For example, we can update the towns collection
+to contain a reference to a document in countries.
+*/
+
+db.towns.update(
+	{ _id : ObjectId("5e09777cc8435cf060041a43")},
+	{ $set : { country: { $ref: "countries", $id: "us" } } }
+)
+
+// dereference --------how to read the country data of the new york city
+
+// get newyork city data
+var newyork = db.towns.findOne( { _id : ObjectId("5e09777cc8435cf060041a43") } )
+ 
+//"country" : DBRef("countries", "us")
+
+// retrieve newyork city country data -- dereference
+var newyorkCountryRef = newyork.country.$ref
+
+// retrieve the country data for newYork city
+db[newyorkCountryRef].findOne({ _id : newyork.country.$id })
+
+/*
+> newyork.country.$ref
+countries
+> db[newyork.country.$ref].findOne({ _id : newyork.country.$id})
+*/
 
 
+///////////////////Delete
+/*
+Removing documents from a collection is simple. Just replace the find() function
+with a call to remove(), and all documents that match given the criteria will be
+removed. It’s important to note that the entire matching document will be
+removed, not just a matching element or a matching subdocument.
+We recommend running find() to verify your criteria before running remove().
+Mongo won’t think twice before running your operation. Let’s remove all
+countries that export bacon that isn’t tasty.
+*/
+
+var badBacon = {
+	'exports.foods' : {
+		$elemMatch: {
+			name : 'bacon',
+			tasty : false
+		}
+	}
+}
+
+// check the search result
+db.countries.find(badBacon)
+
+// looks good, now remove
+db.countries.remove(badBacon)
+db.countries.count() //2
 
 
+// Reading with Code
+/*
+Let’s close out this day with one more interesting query option: code. You can
+request that MongoDB run a decision function across your documents. We
+placed this last because it should always be a last resort. These queries run
+quite slowly, you can’t index them, and Mongo can’t optimize them. But
+sometimes it’s hard to beat the power of custom code.
+
+Let’s say that we’re looking for a city with a population between 6,000 and
+600,000 people.
+*/
+
+db.towns.find( function() {
+	return this.population > 6000 && this.population < 600000;
+} )
+
+// Mongo even has a shortcut for simple decision functions.
+// You can run custom code with other criteria using the $where clause. In this
+// example, the query also filters for towns famous for groundhogs named Phil.
+
+db.towns.find({
+	$where : "this.population > 6000 && this.population < 600000",
+	famousFor : /Phil/
+})
+
+/*
+A word of warning: Mongo will blindly run this function against each document
+despite there being no guarantee that the given field exists in every document.
+For example, if you assume a population field exists and population is missing
+in even a single document, the entire query will fail because the JavaScript
+cannot properly execute. Be careful when you write custom JavaScript
+functions, be comfortable using JavaScript before attempting custom code,
+and in general avoid these sorts of operations in production.
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+Today we took a peek at our first document database, MongoDB. We saw how
+we can store nested structured data as JSON objects and query that data to
+any depth. You learned that a document can be envisioned as a schemaless
+row in the relational model, keyed by a generated _id. A set of documents is
+called a collection in Mongo, similar to a table in PostgreSQL but also quite
+different.
+Unlike the previous styles we’ve encountered, with collections of sets of simple
+datatypes, Mongo stores complex, denormalized documents, stored and
+retrieved as collections of arbitrary JSON structures. Mongo tops off this
+flexible storage strategy with a powerful query mechanism unconstrained by
+any predefined schema.
+Its denormalized nature makes a document database a superb choice for
+storing data with unknown qualities, while other styles (such as relational or
+columnar) prefer, or sometimes even demand, that you know your data
+models in advance and require schema migrations to add or edit fields.
+*/
 
 
 
