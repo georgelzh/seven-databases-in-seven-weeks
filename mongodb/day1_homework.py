@@ -6,6 +6,9 @@ https://www.w3schools.com/python/python_mongodb_create_db.asp
 
 pymongo connection && pymongo regex
 https://kb.objectrocket.com/mongo-db/how-to-query-mongodb-documents-with-regex-in-python-362
+
+
+github repo reference: https://github.com/vichheann/seven-databases/tree/master/mongodb
 """
 import pymongo
 
@@ -52,6 +55,9 @@ for t in e_food_or_beer:
 # create db reference: https://www.w3schools.com/python/python_mongodb_create_db.asp
 # create collection reference: 
 # https://www.w3schools.com/pythonpython_mongodb_create_collection.asp
+date in mongo shell https://docs.mongodb.com/manual/reference/method/Date/
+date insertion in mongodb:
+https://kb.objectrocket.com/mongo-db/how-to-insert-a-document-into-a-mongodb-collection-using-python-367
 """
 
 from datetime import datetime
@@ -84,6 +90,37 @@ datetime_now = datetime.now()
 new_article = {"author_name": "Bill", "email": "bill@gmail.com", 
 "date": datetime_now, "text" : "hiiiiiiiiii, this is my first article, bye."}
 articles.insert_one(new_article)
+
+"""
+# update the article with an array of comments, containing a comment with an
+# author and text
+$update  and create new field
+https://docs.mongodb.com/manual/reference/operator/update/set/
+"""
+
+comments = { "$set" : {"comments" : [ {"author" : "Job", "text" : "hi Bill, welcome",
+"date" : datetime.now()}, {"author": "toby", "text" : "hi Bill, nice to meet u",
+"date" : datetime.now()}]
+}}
+
+find_the_article_query = { "author_name": "Bill" }
+
+article_bill = articles.find_one(find_the_article_query)
+print(article_bill)
+
+# update the comment
+
+articles.update_one(find_the_article_query, comments)
+
+article_bill = articles.find_one(find_the_article_query)
+print("after update \n", article_bill)
+
+
+
+
+
+
+
 
 
 
