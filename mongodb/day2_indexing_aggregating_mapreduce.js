@@ -28,11 +28,11 @@ printjson(db[collection].getIndexes());
 });
 
 /*
-most queries will include more fields than just the _id, so we need to make 
+most queries will include more fields than just the _id, so we need to make
 indexes on those fields.
 gonna make a B-tree index on the display field. First, let's verify the index
 will improve speed. first check a query without an index, the explain() method
-is used to output details of a given operation. 
+is used to output details of a given operation.
 */
 
 db.phones.find({display: "+1 800-565001"}).
@@ -41,9 +41,9 @@ db.phones.find({display: "+1 800-565001"}).
 // "executionTimeMillisEstimate" : 40
 
 /*
-create an index by calling ensureIndex(fields, options) on the collection. 
+create an index by calling ensureIndex(fields, options) on the collection.
 The fields parameter is an object containing the fields to be indexed against.
-he options parameter describes the type of index to make. In this case, 
+he options parameter describes the type of index to make. In this case,
 we’re building a unique index on display that should just drop duplicate entries
 */
 
@@ -101,7 +101,7 @@ components.area. In production, you should always build indexes in the
 background using the { background : 1 } option.
 */
 
-db.phones.ensureIndex( {"components.area" : 1}, { background : 1}) 
+db.phones.ensureIndex( {"components.area" : 1}, { background : 1})
 
 /*
 If we find() all of the system indexes for our phones collection, the new one should
@@ -150,10 +150,10 @@ and running them manually rather than using automated index
 creation. There are plenty more indexing tricks and tips online, but these are
 the basics that may come in handy the most often.
 
-/////////////////Question related statement above: 
+/////////////////Question related statement above:
 what does "indexes simply cost more in mongo than in a relational
 database like postgres mean?" what is the cost? does it mean the moment it's
-creating the indexes, it costs computer resources? or does it mean the query 
+creating the indexes, it costs computer resources? or does it mean the query
 gets slow when the collection is huge even if we have indexes created?
 
 
@@ -165,7 +165,7 @@ mongo. We won’t cover them in this book but we do strongly recommend checking
 them out, as they together make up one of the most amply equipped CLI toolbelts in
 the NoSQL universe.
 
-mongodump: Exports data from Mongo into .bson files. That can mean entire 
+mongodump: Exports data from Mongo into .bson files. That can mean entire
 collections or databases, filtered results based on a supplied query, and more
 
 mongofiles: Manipulates large GridFS data files (GridFS is a specification for BSON
@@ -199,32 +199,255 @@ for more info check out here: https://docs.mongodb.com/manual/reference/program
 */
 
 
+//////////////////Aggregated Queries//////////
+/*
+MongoDB includes a handful of single-purpose aggregators: count() provides
+the number of documents included in a result set (which we saw earlier), distinct()
+collects the result set into an array of unique results, and aggregate()
+returns documents according to a logic that you provide.
+*/
+
+//count the phone numbers greater than 5599999
+db.phones.count({ "components.number" : { $gt : 5599999} })
+
+/*
+The distinct() method returns each matching value (not a full document) where
+one or more exists. We can get the distinct component numbers that are less
+than 5,550,005 in this way
+*/
+
+db.phones.distinct("components.number", 
+{"components.number" : { $lt : 5550005} })
+// [ 5550000, 5550001, 5550002, 5550003, 5550004 ]
+
+/*
+The aggregate() method is more complex but also much more powerful. It enables
+you to specify a pipeline-style logic consisting of stages such as: $match filters
+that return specific sets of documents; $group functions that group based on
+some attribute; a $sort() logic that orders the documents by a sort key; and
+many others.
+
+You can chain together as many stages as you’d like, mixing and matching
+at will. Think of aggregate() as a combination of WHERE, GROUP BY, and ORDER BY
+clauses in SQL. The analogy isn’t perfect, but the aggregation API does a lot
+of the same things.
+*/
+
+db.cities.count()
+//99838
+
+db.cities.find().limit(1)
+db.cities.findOne()
+/*
+{
+"_id" : ObjectId("5913ec4c059c950f9b799895"),
+"name" : "Sant Julià de Lòria",
+"country" : "AD",
+"timezone" : "Europe/Andorra",
+"population" : 8022,
+"location" : {
+	"longitude" : 42.46372,
+	"latitude" : 1.49129
+	}
+}
+*/
+
+// return all unique europe area 
+db.cities.distinct("timezone", { "timezone": /europe/i})
 
 
+/*
+We could use aggregate() to, for example, find the average population for all
+cities in the Europe/London timezone. To do so, we could $match all documents
+where timezone equals Europe/London, and then add a $group stage that produces
+one document with an _id field with a value of averagePopulation and an
+avgPop field that displays the average value across all population values in the
+collection:
+*/
+db.cities.aggregate([
+	{
+		$match: {
+			"timezone": {
+				$eq: 'Europe/London'
+			}
+		}
+	},
+	{
+		$group: {
+			_id: 'averagePopulation', 
+			avgPop: {
+				$avg: '$population'
+			}
+		}
+	}
+])
+// { "_id" : "averagePopulation", "avgPop" : 23226.22149712092 }
+
+/*
+We could also match all documents in that same timezone, sort them in
+descending order by population, and then $project documents that only contain
+the population field:
+*/
+
+db.cities.aggregate([
+	{
+		$match: {
+			"timezone": {
+				$eq: "Europe/London"
+			}
+		}
+	},
+	{
+		$sort: {
+			population: -1
+		}
+	},
+	{
+		$project: {
+			_id: 0,
+			name: 1,
+			population: 1
+		}
+	}
+])
+
+/*
+{ "name" : "City of London", "population" : 7556900 }
+{ "name" : "London", "population" : 7556900 }
+{ "name" : "Birmingham", "population" : 984333 }
+// many others
+*/
+
+// find a city in china
+db.cities.findOne({country:"CN"})
+
+//return all unique country code
+db.cities.distinct("country")
+
+// return number of unique country code
+db.cities.distinct("country").length
+
+// return all cities name and population in china
+db.cities.aggregate([
+	{ $match: { country: "CN"} },
+	{ $project: { _id: 0, name:1, populatation: 1}}
+])
 
 
+// return max population of the city in china
+db.cities.aggregate([
+	{ $match: { country: "CN"} },
+	{ $group: {
+		_id: 'max_population',
+		population: {
+			$max: '$population'
+		}
+	}}
+])
+
+// { "_id" : "max_population", "population" : 14608512 }
+// reference: https://www.javamadesoeasy.com/2017/03/max-operator-in-mongodb-find-maximum.html#3
 
 
+// drop the collection
+db.cities.drop()
+
+/*
+conclusion:
+there are endless possible combinations for aggregation. go explore other stage
+types. Be aware that aggregations can be quite slow if you add a lot of
+stages and/or perform them on very large collections. There are limits to how
+well Mongo, as a schemaless database, can optimize these sorts of operations.
+But if you’re careful to keep your collections reasonably sized and, even better,
+structure your data to not require bold transformations to get the outputs
+you want, then aggregate() can be a powerful and even speedy tool.
+*/
+
+////////Server-Side Commands///////////
+/*
+In addition to evaluating JavaScript functions, there are several pre-built
+commands in Mongo, most of which are executed on the server, although
+some require executing only under the admin database (which you can access
+by entering use admin). The top command, for example, will output access details
+about all collections on the server
+*/
+
+use admin
+db.runCommand("top")
+
+/*
+You can also list all commands that are currently available
+(let’s switch back to the book database first because the admin 
+database provides a different set of commands):
+
+When you run listCommands(), you may notice a lot of commands we’ve used
+already. In fact, you can execute many common commands through the run-
+Command() method, such as counting the number of phones. However, you
+may notice a slightly different output.
+*/
+
+use book
+db.listCommands()
+
+db.runCommand( { "find" : "someCollection"} )
+/*
+{
+	"cursor" : {
+		"id" : NumberLong(0),
+		"ns" : "book.someCollection",
+		"firstBatch" : [ ]
+	},
+	"ok" : 1
+}
+*/
+
+/*
+Here, we see that this function returns an object containing a cursor and an
+ok field. That’s because db.phones.find() is a wrapper function created for our
+convenience by the shell’s JavaScript interface, whereas runCommand() is an
+operation executed on the server. Remember that we can play detective on
+how a function such as find() works by leaving off the calling parentheses.
+*/
+
+db.phones.find
+
+//So what about the DBQuery object? How much more can we find out about it?
+
+DBQuery
+
+//function DBQuery() {
+//    [native code]
+//}
 
 
+/*
+//////////////////////Diversion////////////
+1. most of the execution in the mongo console is executed on the server,
+not the client, which just provides some convenient wrapper functions
+
+2. we can leverage the concept of executing server-side code for our own 
+purposes to create something in MongoDB that’s similar to the stored 
+procedures we saw in PostgreSQL.
+
+Any JavaScript function can be stored in a special collection named system.js. This is
+just a normal collection; you save the function by setting the name as the _id and a
+function object as the value.
+
+*/
+
+db.system.js.save({
+	_id: 'getLast',
+	value: function(collection) {
+		return collection.find({}).sort({'_id':1}).limit(1)[0];
+	}
+})
 
 
+// now you can use that function by loading it into the current namespaces
+db.loadServerScripts()
+getLast(db.phones).display
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+//+1 800-5550002
 
 
 
