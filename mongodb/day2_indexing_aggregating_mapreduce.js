@@ -449,5 +449,119 @@ getLast(db.phones).display
 
 //+1 800-5550002
 
+///////////////Mapreduce (and Finalize)//////////
+// https://docs.mongodb.com/manual/core/map-reduce/
+
+/*
+In MongoDB, the map step involves creating a mapper function that calls an
+emit() function. The benefit of this approach is you can emit more than once per
+document. The reduce() function accepts a single key and a list of values that
+were emitted to that key. Finally, Mongo provides an optional third step called
+finalize(), which is executed only once per mapped value after the reducers are
+run. This allows you to perform any final calculations or cleanup you may need.
+
+Because we already know the basics of mapreduce, we’ll skip the intro wadingpool
+example and go right to the high-dive. Let’s generate a report that counts
+all phone numbers that contain the same digits for each country. First, we’ll
+store a helper function that extracts an array of all distinct numbers (understanding
+how this helper works is not imperative to understanding the overall
+mapreduce).
+
+distinctDigits = function(phone){
+var number = phone.components.number + '',
+seen = [],
+result = [],
+i = number.length;
+while(i--) {
+seen[+number[i]] = 1;
+}
+for (var i = 0; i < 10; i++) {
+if (seen[i]) {
+result[result.length] = i;
+}
+}
+return result;
+}
+db.system.js.save({_id: 'distinctDigits', value: distinctDigits})
+*/
+
+// load distinct Digits.js in mongo
+load('C:\\Users\\George\\Desktop\\Seven-Databases-in-Seven-Weeks\\mongodb\\distinctDigits.js')
+
+/*
+Now we can get to work on the mapper. As with any mapreduce function,
+deciding what fields to map by is a crucial decision because it dictates the
+aggregated values that you return. Because our report is finding distinct
+numbers, the array of distinct values is one field. But because we also need
+to query by country, that is another field. We add both values as a compound
+key: {digits : X, country : Y}.
+Our goal is to simply count these values, so we emit the value 1 (each document
+represents one item to count). The reducer’s job is to sum all those 1s
+together.
+*/
+
+map = function() {
+	var digits = distinctDigits(this);
+	emit({
+		digits: digits,
+		country: this.components.country
+	},{
+		count : 1
+	})
+}
+
+reduce = function(key, values) {
+	var total = 0; 
+	for (var i = 0; i < values.length; i++) {
+		total += values[i].count;
+	}
+	return { count: total };
+}
 
 
+/*
+Because we set the collection name via the out parameter (out: 'phones.report'),
+you can query the results like any other. It’s a materialized view that you can
+see in the show tables list.
+*/
+
+results = db.runCommand({
+	mapReduce: 'phones',
+	map: map,
+	reduce: reduce,
+	out: 'phones.report'
+})
+
+/*
+Type it to continue iterating through the results. Note that the unique emitted
+keys are under the field _ids, and all of the data returned from the reducers
+is under the field value.
+
+If you prefer that the mapreducer just output the results, rather than outputting
+to a collection, you can set the out value to { inline : 1 }, but bear in
+mind that there is a limit to the size of a result you can output. As of Mongo
+2.0, that limit is 16 MB.
+
+Reducers can have either mapped (emitted) results or other reducer results
+as inputs.
+*/
+
+reduce = function(key, values) {
+	var total = 0;
+	for (var = 0; i < values.lengthl i++) {
+		var data = values[i];
+		if('total' in data) {
+			total += data.total;
+		} else {
+			total += data.count;
+		}
+	}
+	return { total: total };
+}
+
+/*
+However, Mongo predicted that you might need to perform some final changes,
+such as renaming a field or some other calculations. If you really need the
+output field to be total, you can implement a finalize() function, which works
+the same way as the finalize function under group().
+*/
