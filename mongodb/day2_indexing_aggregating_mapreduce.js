@@ -564,4 +564,14 @@ However, Mongo predicted that you might need to perform some final changes,
 such as renaming a field or some other calculations. If you really need the
 output field to be total, you can implement a finalize() function, which works
 the same way as the finalize function under group().
+
+
+
+Day 2 Wrap-Up
+On Day 2, we’ve expanded our query power by including several aggregate
+queries: count(), distinct(), and topped off by aggregate(). To speed up the response
+time of these queries, we used MongoDB’s indexing options. When more
+power is required, the ever-present mapReduce() is available.
 */
+
+
