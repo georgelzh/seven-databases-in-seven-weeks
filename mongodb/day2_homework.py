@@ -166,5 +166,3 @@ test.phones.inline_map_reduce(map, reduce, finalize=finalize_func)
                 }       ...
 }
 """
-# 2. Install a Mongo driver for a language of your choice, and connect to 
-# the database. Populate a collection through it, and index one of the fields.
