@@ -65,4 +65,110 @@ rs.initiate({
 })
 
 
-// keep going
+// rs.status().ok
+// 1
+
+/*
+Notice we’re using a new object called rs (replica set) instead of db (database).
+Like other objects, it has a help() method you can call. Running the status()
+command will let us know when our replica set is running, so just keep
+checking the status for completion before continuing. If you watch the three
+server outputs, you should see that one server outputs this line:
+Member ... is now in state PRIMARY
+
+PRIMARY will be the master server. Chances are, this will be the server on port
+27011 (because it started first); however, if it’s not, go ahead and fire up a
+console to the primary. Just insert any old thing on the command line, and
+we’ll try an experiment.
+*/
+
+db.echo.insert({ say : 'HELLO!' })
+
+/*
+now quit console, and kill the primary mongod, after this, a new primary will
+be elected, find that new primary. it shows in the mongod server log. 
+
+open a console into that primary mongod.
+*/
+db.echo.find({}) //returns the value we just inserted
+
+
+/*
+We’ll play one more round of our console-shuffle game. Open a console into
+the remaining SECONDARY server by running mongo localhost:27013 . Just to be sure,
+run the isMaster() function. Ours looked like this:
+
+> db.isMaster().ismaster
+false
+> db.isMaster().primary
+localhost:27012
+
+In this shell, let’s attempt to insert another value on the secondary server
+*/
+
+db.echo.insert({say: "is this thing on?"})
+/*
+book:SECONDARY> db.echo.insert({say: "is this thing on?"})
+WriteCommandError({
+	"operationTime" : Timestamp(1592713833, 1),
+	"ok" : 0,
+	"errmsg" : "not master",
+	"code" : 10107,
+	"codeName" : "NotMaster",
+	"$clusterTime" : {
+		"clusterTime" : Timestamp(1592713833, 1),
+		"signature" : {
+			"hash" : BinData(0,"AAAAAAAAAAAAAAAAAAAAAAAAAAA="),
+			"keyId" : NumberLong(0)
+		}
+	}
+})
+
+book:SECONDARY> db.echo.find({})
+Error: error: {
+	"operationTime" : Timestamp(1592713980, 1),
+	"ok" : 0,
+	"errmsg" : "not master and slaveOk=false",
+	"code" : 13435,
+	"codeName" : "NotMasterNoSlaveOk",
+	"$clusterTime" : {
+		"clusterTime" : Timestamp(1592713980, 1),
+		"signature" : {
+			"hash" : BinData(0,"AAAAAAAAAAAAAAAAAAAAAAAAAAA="),
+			"keyId" : NumberLong(0)
+		}
+	}
+}
+
+This message is letting us know that we can neither write to a secondary node
+nor read directly from it. There is only one master per replica set, and you
+must interact with it. It is the gatekeeper to the set.
+Replicating data has its own issues not found in single-source databases. In
+the Mongo setup, one problem is deciding who gets promoted when a master
+node goes down. Mongo deals with this by giving each mongod service a vote,
+and the one with the freshest data is elected the new master. Right now, you
+should still have two mongod services running. Go ahead and shut down the
+current master (aka primary node). Remember, when we did this with three
+nodes, one of the others just got promoted to be the new master. Now the last
+remaining node is implicitly the master.
+Go ahead and relaunch the other servers and watch the logs. When the nodes
+are brought back up, they go into a recovery state and attempt to resync their
+data with the new master node. “Wait a minute!?” we hear you cry. “So, what
+if the original master had data that did not yet propagate?” Those operations
+are dropped. A write in a Mongo replica set isn’t considered successful until
+most nodes have a copy of the data.
+*/
+
+
+
+
+
+/*
+install mongodb on ubuntu and how to run and stop it: 
+https://docs.mongodb.com/manual/tutorial/install-mongodb-on-ubuntu/
+
+deletion:
+https://docs.mongodb.com/manual/reference/method/db.collection.deleteOne/#db.collection.deleteOne
+
+
+*/
