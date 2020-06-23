@@ -53,7 +53,7 @@ Mongo is letting us know that. Fire up a mongo shell to one of the servers, and
 execute the rs.initiate() function.
 */
 
-//$ mongo localhost:27011
+$ mongo localhost:27011
 
 rs.initiate({
     _id: "book",
@@ -157,8 +157,79 @@ data with the new master node. “Wait a minute!?” we hear you cry. “So, wha
 if the original master had data that did not yet propagate?” Those operations
 are dropped. A write in a Mongo replica set isn’t considered successful until
 most nodes have a copy of the data.
-*/
 
+
+///////////The Problem with Even Nodes
+MongoDB expects an odd number of total nodes in the replica set. Consider
+a five-node network, for example. If connection issues split it into a three-
+node fragment and a two-node fragment, the larger fragment has a clear
+majority and can elect a master and continue servicing requests. With no
+clear majority, a quorum couldn’t be reached
+
+To see why an odd number of nodes is preferred, consider what might happen
+to a four-node replica set. Say a network partition causes two of the servers
+to lose connectivity from the other two. One set will have the original master,
+but because it can’t see a clear majority of the network, the master steps
+down. The other set will similarly be unable to elect a master because it, too,
+can’t communicate with a clear majority of nodes. Both sets are now unable
+to process requests and the system is effectively down. Having an odd number
+of total nodes would have made this particular scenario—a fragmented network
+where each fragment has less than a clear majority—less likely to occur.
+
+Because it’s a CP system, Mongo always knows the most recent value; the
+client needn’t decide. Mongo’s concern is strong consistency on writes, and
+preventing a multimaster scenario is not a bad method for achieving it.
+
+//Solution:
+Voting and Arbiters
+You may not always want to have an odd number of servers replicating data. In that
+case, you can either launch an arbiter (generally recommended) or increase voting
+rights on your servers (generally not recommended). 
+
+You launch it just like any other server but on configuration set a flag, like 
+this: {_id: 3, host: 'localhost:27013', arbiterOnly : true}. Arbiters are useful 
+for breaking ties, like the U.S. Vice President in the Senate. By default, 
+each mongod instance has a single vote.
+
+For more detail you can google.
+
+
+///////////////////////----------Sharding-----------///////////////
+One of the core goals of Mongo is to provide safe and quick handling of very
+large datasets. The clearest method of achieving this is through horizontal
+sharding by value ranges—or just sharding for brevity. Rather than a single
+server hosting all values in a collection, some range of values is split, or
+sharded, onto other servers.
+For example, in our phone numbers collection,
+we may put all phone numbers less than 1-500-000-0000 onto Mongo server
+A and put numbers greater than or equal to 1-500-000-0001 onto server B.
+Mongo makes this easier by autosharding, managing this division for you.
+
+Let’s launch a couple of (nonreplicating) mongod servers. Like replica sets,
+there’s a special parameter necessary to be considered a shard server (which
+just means this server is capable of sharding).
+*/
+mkdir ./mongo4 ./mongo5
+mongod --shardsvr --dbpath ./mongo4 --port 27014
+mongod --shardsvr --dbpath ./mongo5 --port 27015
+
+
+rs.initiate({
+	_id: 'configSet',
+	configsvr: true,
+	members: [
+	{
+	_id: 0,
+	host: 'localhost:27016'
+	}
+	]
+})
+
+
+
+
+
+mongoimport --host=localhost:27020 --db=test --collection=cities --type=json --file=mongoCities100000.json
 
 
 
@@ -170,5 +241,7 @@ https://docs.mongodb.com/manual/tutorial/install-mongodb-on-ubuntu/
 deletion:
 https://docs.mongodb.com/manual/reference/method/db.collection.deleteOne/#db.collection.deleteOne
 
+mongoimport: 
+https://www.youtube.com/watch?v=sK0MP1i1pbc
 
 */
