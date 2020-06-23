@@ -374,20 +374,64 @@ As you can see, Mongo’s aggregation API provides a very nice interface for wor
 with schemaless geospatial data. We’ve only scratched the surface here (no pun
 intended), but if you’re interested in exploring the full potential of MongoDB, we
 strongly encourage you to dig more deeply
+
+
+//////////------------GridFS------------///////////////
+One downside of a distributed system can be the lack of a single coherent filesystem.
+Say you operate a website where users can upload images of themselves. If you
+run several web servers on several different nodes, you must manually replicate
+the uploaded image to each web server’s disk or create some alternative central
+system. Mongo handles this scenario using a distributed filesystem called GridFS.
+
+Mongo comes bundled with a command-line tool for interacting with GridFS. The
+great thing is that you don’t have to set up anything special to use it. If you list
+the files in the mongos managed shards using the command mongofiles , you get an
+empty list.
 */
 
+// create a file in terminal
+echo "some gibberish, bubbly bubble admin da taco, wabbly \
+shuffle da trembling Hubble. Do you know the riddle?" -> just-some-data.txt
 
 
+// update the file to mongos in terminal
+mongofiles -h localhost:27020 put just-some-data.txt //	added file: just-some-data.txt
 
 
+// check file list in mongos in terminal
+mongofiles -h localhost:27020 list // just-some-data.txt
 
+// Back in your mongo console, you can see the collections Mongo stores the data in.
+mongo localhost:27020
 
+show collections //cities; fs.chunks; fs.files
 
+// Because they’re just plain old collections, they can be replicated or queried
+// like any other. Here we’ll look up the filename of the text file we imported.
 
+db.fs.files.find()
 
+/*
+/////////////////------------Day 3 Wrap-Up--------//////////
+his wraps up our investigation of MongoDB. Today we focused on how Mongo
+enhances data durability with replica sets and supports horizontal scaling with
+sharding. We looked at good server configurations and how Mongo provides the
+mongos server to act as a relay for handling autosharding between multiple nodes.
+Finally, we toyed with some of Mongo’s built-in tools, such as geospatial queries
+and GridFS.
 
+Day 3 Homework
+Find
+1. Read the full replica set configuration options in the online docs.
+2. Find out how to create a spherical geo index.
+Do
+1. Mongo has support for bounding shapes (namely, squares and circles).
+Find all cities within a 50-mile radius around the center of London. 5
+2. Run six servers: three servers in a replica set, and each replica set is one
+of two shards. Run a config server and mongos . Run GridFS across them
+(this is the final exam).
 
-
+*/
 
 /*
 install mongodb on ubuntu and how to run and stop it: 
