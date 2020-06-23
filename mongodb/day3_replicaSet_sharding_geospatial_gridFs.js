@@ -316,7 +316,75 @@ mongoCities100000.json
 /*
 If the import is successful, you should see imported 99838 documents in the output
 (not quite 100,000 cities as the filename would suggest, but pretty close).
+
+
+///////////////////-----GeoSpatial Queries------/////////////
+mongo can quickly perform geospatial queries. The core of the geospatial secret lies in
+indexing. It's a special form of indexing geographic data called "geohash" that not only
+finds values of a specific value or range quickly but finds nearby values quickly in
+ad hoc queries. 
+To query the geo data we imported previously. we need to 1. index the data on the
+location field. the 2d index must be set on any two value fields, in our case a hash
+{for example, {longitude: 1.48453, 42.57205}}, but it could easily have been an array
+(for example[1.48453, 42.57205])
 */
+
+//first connect to the mongos sharded server open terminal run
+mongo localhost:27020
+
+//index the geo data, 
+db.cities.createIndex({ location: "2d" })
+
+/*
+now we can aggregate pipeline to assemble a list of all cities close to portland,
+OR sorted in descending order by population (displaying the name of the city, the
+population, and the distance from the 45.52/-122.67
+
+*/
+
+db.cities.aggregate([
+	{
+		$geoNear: {
+			near:  [45.52, -122.67],
+			key: "location",
+			distanceField: "dist.calculated"
+		}
+	},
+	{
+		$project: {
+			_id: 0,
+			name: 1,
+			population: 1,
+			dist: 1
+		}
+	},
+	{ $limit: 10 }
+])
+
+
+// check indexes on a collection
+db.cities.getIndexes()
+
+
+//drop a specific index on a collection, here I drop "locarion_2d"
+db.cities.dropIndex("location_2d")
+
+/*
+As you can see, Mongo’s aggregation API provides a very nice interface for working
+with schemaless geospatial data. We’ve only scratched the surface here (no pun
+intended), but if you’re interested in exploring the full potential of MongoDB, we
+strongly encourage you to dig more deeply
+*/
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -332,5 +400,16 @@ mongoimport:
 https://www.youtube.com/watch?v=sK0MP1i1pbc
 https://docs.mongodb.com/manual/reference/program/mongoimport/#cmdoption-mongoimport-host
 possible json format https://docs.mongodb.com/manual/reference/mongodb-extended-json/
+
+
+
+geospatial query
+https://docs.mongodb.com/manual/geospatial-queries/
+
+mongo geospatial $geoNear
+https://docs.mongodb.com/manual/reference/operator/aggregation/geoNear/#pipe._S_geoNear
+https://www.docs4dev.com/docs/en/mongodb/v3.6/reference/reference-operator-aggregation-geoNear.html
+
+
 
 */
