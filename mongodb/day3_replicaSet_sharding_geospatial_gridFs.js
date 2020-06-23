@@ -213,6 +213,24 @@ mkdir ./mongo4 ./mongo5
 mongod --shardsvr --dbpath ./mongo4 --port 27014
 mongod --shardsvr --dbpath ./mongo5 --port 27015
 
+/*
+Now you need a server to actually keep track of your keys. Imagine you created
+a table to store city names alphabetically. You need some way to know that,
+for example, cities starting with A through N go to server mongo4 and O
+through Z go to server mongo5. In Mongo, you create a config server (which
+is just a regular mongod ) that keeps track of which server (mongo4 or mongo5)
+owns what values. You’ll need to create and initialize a second replica set for
+the cluster’s configuration (let’s call it configSet ).
+*/
+
+mkdir ./mongoconfig
+mongod --configsvr --replSet configSet --dbpath ./mongoconfig --port 27016
+
+
+/*
+Now enter the Mongo shell for the config server by running mongo localhost:27016
+and initiate the config server cluster (with just one member for this example):
+*/
 
 rs.initiate({
 	_id: 'configSet',
@@ -225,11 +243,80 @@ rs.initiate({
 	]
 })
 
+rs.status().ok // 1
+
+/*
+Finally, you need to run yet another server called mongos , which is the single
+point of entry for our clients. The mongos server will connect to the mongoconfig
+config server to keep track of the sharding information stored there. You point
+mongos to the replSet/server:port with the --configdb flag.
+*/
+
+mongos --configdb configSet/localhost:27016 --port 27020
+
+/*
+A neat thing about mongos is that it is a lightweight clone of a full mongod
+server. Nearly any command you can throw at a mongod you can throw at a
+mongos , which makes it the perfect go-between for clients to connect to multiple
+sharded servers. The following picture of our server setup may help.
+
+Clients -> mongos
+mongos -> [config(mongod), shard1(mongod), shard2(mongod)]
+config(mongod) -> [shard1(mongod), shard2(mongod]
+shard1(mongod) -> config(mongod)
+shard2(mongod) -> config(mongod)
+*/
 
 
+/*
+Now let’s jump into the mongos server console in the admin database by running
+mongo localhost:27020/admin . We’re going to configure some sharding.
+*/
+sh.addShard('localhost:27014') // {"shardAdded" : "shard0000", "ok" : 1 }
+sh.addShard('localhost:27015') // {"shardAdded" : "shard0001", "ok" : 1 }
 
 
+/*
+With that setup, now we have to give it the database and collection to shard
+and the field to shard by (in our case, the city name).
+*/
+db.runCommand({ enablesharding : "test" }) //ok:1
+
+db.runCommand({ shardcollection : "test.cities", key : {name : 1} }) // ok:1
+
+/*
+//////////mongos vs. mongoconfig
+You may wonder why Mongo separates the config server and the mongos point of entry
+into two different servers. In production environments, they will generally live on
+different physical servers. The config server (which can itself be replicated across
+multiple servers) manages the sharded information for other sharded servers, while
+mongos will likely live on your local application server where clients can easily connect
+(without needing to manage which shards to connect to).
+
+
+With all that setup out of the way, let’s load some data. If you download the
+book code, you’ll find a 12 MB data file named mongoCities100000.json that con-
+tains data for every city in the world with a population of more than 1,000
+people. Download that file, and run the following import script that imports
+the data into your mongos server:
+*/
+
+// run this in Linux terminal rather than running it inside of mongo Client
 mongoimport --host=localhost:27020 --db=test --collection=cities --type=json --file=mongoCities100000.json
+
+/*
+mongoimport \
+--host localhost:27020 \
+--db test \
+--collection cities \
+--type json \
+mongoCities100000.json
+*/
+
+/*
+If the import is successful, you should see imported 99838 documents in the output
+(not quite 100,000 cities as the filename would suggest, but pretty close).
+*/
 
 
 
@@ -243,5 +330,7 @@ https://docs.mongodb.com/manual/reference/method/db.collection.deleteOne/#db.col
 
 mongoimport: 
 https://www.youtube.com/watch?v=sK0MP1i1pbc
+https://docs.mongodb.com/manual/reference/program/mongoimport/#cmdoption-mongoimport-host
+possible json format https://docs.mongodb.com/manual/reference/mongodb-extended-json/
 
 */
