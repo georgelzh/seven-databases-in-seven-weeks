@@ -198,8 +198,8 @@ sh.shardCollection( "shard.cities", { "name" : "hashed" } ) // ok: 1
 */
 
 
-/* SUCCESSFUL SHARDING*/
-mongo localhost:27030
+/////////////////////////////* SUCCESSFUL SHARDING*/
+mongo localhost:27030/admin
 use shard
 db.createCollection("movies")
 sh.enableSharding( "shard" )
@@ -209,14 +209,19 @@ sh.shardCollection( "shard.movies", { "title" : "hashed" } )
 /*
 for i in $(seq 1 50); do echo -e "use shard \n db.movies.insertOne\
 ({\"title\":\"spider man $i\", \"language\": \"english\"})"  | mongo localhost:27030; done
+
+
+question: 
+everything good, shard on this collection works well. That means my setting should be fine.
+Then what's wrong with sharding on existing collection? is it bc of my shard key?
 */
+////////////////////////////////////////////////////////
 
 
-// everything good, shard on this collection works well.
-// what's wrong with that collection cities? 
 
 
-/* FAILURE TRIAL FAILED to shard on an existing collection.
+
+/* ///////////////////////FAILURE TRIAL FAILED to shard on an existing collection.
 // try shard on a collection that has data already this time
 use shard
 db.createCollection("movies2")
@@ -231,22 +236,28 @@ use shard
 db.movies2.createIndex( { title: "hashed" } ) // ok: 1
 
 sh.shardCollection( "shard.movies2", { "title" : "hashed" } ) 
+
+
+It did not work out here.
+Question is why is this happening?  do i need to containerize all these servers?
 */
 
 
-///////////////----------------/check if cities collection is sharded
+
+
+///////////-----------SUCCESS---------///////sharding on empty collection named city with shard Key: "name": "hashed"
+// them import data, it worked
+
+// create collection
 use shard
-db.movies.getShardDistribution()
-
-// check shard balance
-use shard
-db.stats()
-db.printShardingStatus()
-
-// check shard status
-sh.status()
+db.createCollection("cities")
 
 
+// select shard key as "name: hashed" and shard the collection with it. 
+use admin
+db.runCommand( { shardcollection : "shard.cities", key : {"name":"hashed" } })
+
+// import the data
 /*
 mongoimport \
 --host localhost:27030 \
@@ -255,6 +266,56 @@ mongoimport \
 --type json \
 /home/zhihongli/Desktop/Seven-Databases-in-Seven-Weeks/mongodb/mongoCities100000.json
 */
+//////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+///////////////----------------/check if cities collection is sharded
+use shard
+db.cities.getShardDistribution()
+
+// check shard balance
+use shard
+db.stats()
+db.printShardingStatus()
+
+// check shard status
+sh.status()
+///////////////////////////////////////////////////////////////
+
+
+
+/////////// Another failed trial ---------I used location:1 and location"2d" as shard key, it did not work out.
+//let's try compound shard key { name: 1, country: 1}, FAILEDD in the end
+//one thing i found is that even if you drop a collection, its indexes stil exists. so you have to drop its indexes
+//after dropping the collection too. so that you start clean.
+
+use shard
+db.createCollection("cities2")
+
+//then import city data like how we did it previously, this time collection is cities2
+
+//terminal
+mongoimport \
+--host localhost:27030 \
+--db shard \
+--collection cities2 \
+--type json \
+/home/zhihongli/Desktop/Seven-Databases-in-Seven-Weeks/mongodb/mongoCities100000.json
+
+//enter mongos
+mongo localhost:27030/shard
+
+//create compound indexes as shard key
+db.cities2.createIndex({"name": 1, "country": 1})
+
+//shard the collection with the key
+use admin
+db.runCommand( { shardcollection : "shard.cities2", key : {"name": 1, "country": 1 }})
+
+//
+///////////////////////////////////////////////////////////
+
 
 
 /*
@@ -262,4 +323,8 @@ reference:
 https://docs.mongodb.com/manual/tutorial/convert-replica-set-to-replicated-shard-cluster/
 
 https://www.youtube.com/watch?v=Rwg26U0Zs1o&t=953s
+
+compound shard key for zone
+https://docs.mongodb.com/manual/tutorial/sharding-segmenting-data-by-location/
+
 */
