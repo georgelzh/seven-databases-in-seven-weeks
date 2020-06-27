@@ -228,9 +228,10 @@ mongod --configsvr --replSet configSet --dbpath ./mongoconfig --port 27016
 
 
 /*
-Now enter the Mongo shell for the config server by running mongo localhost:27016
+Now enter the Mongo shell for the config server by running 'mongo localhost:27016'
 and initiate the config server cluster (with just one member for this example):
 */
+mongo localhost:27016
 
 rs.initiate({
 	_id: 'configSet',
