@@ -1,3 +1,0 @@
-[submodule "mongodb/sharding"]
-	path = mongodb/learn-mongodb
-	url = https://github.com/justmeandopensource/learn-mongodb
