@@ -272,7 +272,7 @@ mongoimport \
 
 ///////////////----------------/check if cities collection is sharded
 use shard
-db.cities.getShardDistribution()
+db.cities2.getShardDistribution()
 
 // check shard balance
 use shard
@@ -318,13 +318,183 @@ db.runCommand( { shardcollection : "shard.cities2", key : {"name": 1, "country":
 
 
 
+
+
+
+////////////////////////////-----------------Set up Sharding using Docker Containers
+
+//Config servers
+//Start config servers (3 member replica set)
+
+docker-compose -f config-server/docker-compose.yaml up -d
+
+//Initiate replica set
+mongo mongodb://10.10.240.102:40001
+
+rs.initiate(
+    {
+      _id: "cfgrs",
+      configsvr: true,
+      members: [
+        { _id : 0, host : "10.10.240.102:40001" },
+        { _id : 1, host : "10.10.240.102:40002" },
+        { _id : 2, host : "10.10.240.102:40003" }
+      ]
+    }
+  )
+
+
+rs.status()
+
+
+
+
+/////Shard 1 servers
+//Start shard 1 servers (3 member replicas set)
+docker-compose -f shard1/docker-compose.yaml up -d
+
+// Initiate replica set
+
+mongo mongodb://10.10.240.102:50001
+
+rs.initiate(
+{
+    _id: "shard1rs",
+    members: [
+    { _id : 0, host : "10.10.240.102:50001" },
+    { _id : 1, host : "10.10.240.102:50002" },
+    { _id : 2, host : "10.10.240.102:50003" }
+    ]
+}
+)
+
+rs.status()
+
+
+////Mongos Router
+
+// change the setting in the mongos/docker-compose.yaml
+// set up mongos using docker
+docker-compose -f mongos/docker-compose.yaml up -d
+
+// start mongos
+mongo mongodb://10.10.240.102:60000
+
+// add shard
+sh.addShard("shard1rs/10.10.240.102:50001,10.10.240.102:50002,10.10.240.102:50003")
+
+// check
+sh.status()
+
+
+
+/////Adding another shard
+docker-compose -f shard2/docker-compose.yaml up -d
+
+// Initiate replica set
+mongo mongodb://10.10.240.102:50004
+
+rs.initiate(
+    {
+        _id: "shard2rs",
+        members: [
+        { _id : 0, host : "10.10.240.102:50004" },
+        { _id : 1, host : "10.10.240.102:50005" },
+        { _id : 2, host : "10.10.240.102:50006" }
+        ]
+    }
+    )
+
+rs.status()
+
+
+
+mongo mongodb://10.10.240.102:60000
+// add shard
+sh.addShard("shard2rs/10.10.240.102:50004,10.10.240.102:50005,10.10.240.102:50006")
+
+// check
+sh.status()
+
+
+//import data into the docker servers
+mongoimport \
+--host 10.10.240.102:60000 \
+--db shard \
+--collection cities2 \
+--type json \
+/home/zhihongli/Desktop/Seven-Databases-in-Seven-Weeks/mongodb/mongoCities100000.json
+
+
+//shard it now
+mongo mongodb://10.10.240.102:60000/admin
+use admin
+sh.enableSharding( "shard" )
+use shard
+db.cities2.createIndex({"name": "hashed"})
+
+use admin
+sh.shardCollection( "shard.cities2", { "name" : "hashed" } )
+
+
+
+////////////////////////////////////////////////////
+////////////////////////////////////////////////////
+
+////////////////////////////////////////////////////
+////////////////////////////////////////////////////
+
+////////////////////////////////////////////////////
+////////////////////////////////////////////////////
+// -----------------------SHARD GRIDFS----------------------------
+mongo mongodb://10.10.240.102:60000/admin
+db.runCommand({ shardCollection: "shard.fs.chunks", key: {files_id: 1 } })
+
+//upload just-some-data.txt to database called "shard" run it on terminal
+
+mongofiles --host=10.10.240.102:60000 -d=shard put just-some-data.txt
+mongofiles --host=10.10.240.102:60000 -d=shard put just-some-data-copy.txt
+
+
 /*
 reference:
+convert-replica-set to replicated shard cluster tutorial
 https://docs.mongodb.com/manual/tutorial/convert-replica-set-to-replicated-shard-cluster/
 
 https://www.youtube.com/watch?v=Rwg26U0Zs1o&t=953s
 
+
+compound index
+https://docs.mongodb.com/manual/core/index-compound/
+
 compound shard key for zone
 https://docs.mongodb.com/manual/tutorial/sharding-segmenting-data-by-location/
+
+// shard on an empty collection -> solving issue about sharding on collection cities
+https://github.com/justmeandopensource/learn-mongodb/tree/master/sharding
+
+
+shard docker containers set up tutorial
+https://www.youtube.com/watch?v=7Lp6R4CmuKE&list=PL34sAs7_26wPvZJqUJhjyNtm7UedWR8Ps&index=7
+
+https://github.com/justmeandopensource/learn-mongodb
+
+about sharding on existing collection -> solution
+https://dba.stackexchange.com/questions/207196/mongodb-sharding-an-collection-with-data-already-in-it
+
+
+
+API manual
+http://man.hubwiz.com/
+
+
+shard GridFS
+http://man.hubwiz.com/docset/MongoDB.docset/Contents/Resources/Documents/docs.mongodb.org/manual/tutorial/shard-gridfs-data/index.html
+
+upload files GridFS
+https://docs.mongodb.com/manual/reference/program/mongofiles/#bin.mongofiles
+
+reference for gridFS
+https://github.com/vichheann/seven-databases/tree/master/mongodb/day3
 
 */
