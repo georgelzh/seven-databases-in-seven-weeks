@@ -1,0 +1,38 @@
+Wrap-Up
+We hope this taste of MongoDB has piqued your fancy and showed you how
+it earns the moniker of the “humongous” database. We covered a lot in a
+single chapter, but as usual, we only clawed at the surface.
+
+Mongo’s Strengths
+Mongo’s primary strength lies in its ability to handle huge amounts of data
+(and huge amounts of requests) by replication and horizontal scaling. But it
+also has an added benefit of a very flexible data model. You don’t ever need
+to conform to a schema and can simply nest any values you would generally
+join using SQL in an RDBMS.
+Finally, MongoDB was built to be easy to use. You may have noticed the
+similarity between Mongo commands and SQL database concepts (minus the
+server-side joins). This is not by accident and is one reason Mongo has so
+much mind share amongst people who have defected from the relational
+database camp. It’s different enough to scratch a lot of developer itches but
+not so different that it becomes a weird and scary monster.
+Mongo’s Weaknesses
+Mongo encourages denormalization of schemas (by not having any) and that
+can be a bit too much for some to swallow. Some developers find the cold,
+hard constraints of a relational database reassuring. It can be dangerous to
+insert any old value of any type into any collection. A single typo can cause
+hours of headache if you don’t think to look at field names and collection
+names as a possible culprit. Mongo’s flexibility is generally not important if
+your data model is already fairly mature and locked down.
+Because Mongo is focused on large datasets, it works best in large clusters,
+which can require some effort to design and manage. Unlike some clustered
+databases where adding new nodes is a transparent and relatively painless
+process, setting up a Mongo cluster requires a little more forethought.
+Parting Thoughts
+Mongo is an excellent choice if you are currently using a relational database
+to store your data using ORM-style patterns. We often recommend it to
+developers steeped in frameworks such as Ruby on Rails and Django because
+they can then perform validations and field management through the models
+at the application layer and because schema migrations become a thing of
+the past (for the most part). Adding new fields to a document is as easy as
+adding a new field to your data model, and Mongo will happily accept the new
+terms. We find Mongo to be a much more natural answer to many common
