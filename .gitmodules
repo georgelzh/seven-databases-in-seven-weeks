@@ -1,0 +1,3 @@
+[submodule "mongodb/sharding"]
+	path = mongodb/mongodb-docker-containers-setup-files
+	url = https://github.com/justmeandopensource/learn-mongodb
