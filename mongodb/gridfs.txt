@@ -1,0 +1,3 @@
+gridfs details and usage
+
+https://developer.mongodb.com/how-to/storing-large-objects-and-files#:~:text=Large%20objects%2C%20or%20%22files%22,100MB%20videos%20in%20the%20database.&text=MongoDB%20stores%20objects%20in%20a,for%20a%20binary%20byte%20array.
